@@ -13,6 +13,9 @@ import {
   checkRateLimit,
   handleProviderError,
   parseRecipients,
+  buildDraftPreview,
+  DraftPreviewSchema,
+  PreviewErrorSchema,
 } from './compose-helpers.js';
 
 // --- Shared schemas ---
@@ -20,6 +23,8 @@ import {
 const DraftOutput = z.object({
   success: z.boolean(),
   draftId: z.string().optional(),
+  preview: DraftPreviewSchema.optional(),
+  previewError: PreviewErrorSchema.optional(),
   error: z.object({
     code: z.string(),
     message: z.string(),
@@ -116,9 +121,13 @@ export const createDraftAction: EmailAction<
           cc: parsed.cc,
           bodyHtml: outBodyHtml,
         });
+        const previewResult = result.success && result.draftId
+          ? await buildDraftPreview(ctx.provider, result.draftId)
+          : {};
         return {
           success: result.success,
           draftId: result.draftId,
+          ...previewResult,
           error: result.error ? { code: result.error.code, message: result.error.message, recoverable: result.error.recoverable } : undefined,
         };
       } catch (err) {
@@ -135,9 +144,13 @@ export const createDraftAction: EmailAction<
         body,
         bodyHtml: outBodyHtml,
       });
+      const previewResult = result.success && result.draftId
+        ? await buildDraftPreview(ctx.provider, result.draftId)
+        : {};
       return {
         success: result.success,
         draftId: result.draftId,
+        ...previewResult,
         error: result.error ? { code: result.error.code, message: result.error.message, recoverable: result.error.recoverable } : undefined,
       };
     } catch (err) {
@@ -330,9 +343,17 @@ export const updateDraftAction: EmailAction<
 
     try {
       const result = await ctx.provider.updateDraft(input.draft_id, partial);
+      // Note: Gmail's updateDraft already does an internal getMessage to merge
+      // partial updates, so this read-back is a second redundant GET on Gmail.
+      // Acceptable for v1 — see buildDraftPreview docs for the optimization
+      // path (provider returning the persisted draft directly).
+      const previewResult = result.success && result.draftId
+        ? await buildDraftPreview(ctx.provider, result.draftId)
+        : {};
       return {
         success: result.success,
         draftId: result.draftId,
+        ...previewResult,
         error: result.error ? { code: result.error.code, message: result.error.message, recoverable: result.error.recoverable } : undefined,
       };
     } catch (err) {
