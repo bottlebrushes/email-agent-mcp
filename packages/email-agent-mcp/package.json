@@ -6,6 +6,7 @@
   "main": "./index.js",
   "types": "./index.d.ts",
   "bin": {
+    "agent-mail": "./bin/email-agent-mcp.js",
     "email-agent-mcp": "./bin/email-agent-mcp.js"
   },
   "exports": {
